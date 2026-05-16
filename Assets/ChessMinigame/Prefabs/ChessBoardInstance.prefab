@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &6453871933721197344
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6618207377615492252}
+  - component: {fileID: 234903972913800274}
+  m_Layer: 0
+  m_Name: ChessBoardInstance
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6618207377615492252
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6453871933721197344}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &234903972913800274
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6453871933721197344}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d338e887f9f456e4f94278b0a8e3672d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ChessGame.ChessBoardInstantiator
+  PawnPrefab: {fileID: 9011800720148752529, guid: 89ebb939453dadf4a8992d352541b15a, type: 3}
+  RookPrefab: {fileID: 7474709878572272503, guid: 53aaa8517dd23c143aadeb8bce1e4601, type: 3}
+  KnightPrefab: {fileID: 680090746197971489, guid: bf46082d2c527e74a8f472211fb9c9dc, type: 3}
+  BishopPrefab: {fileID: 1996385565331625093, guid: 08ac1eb25342ca84dad8e7dab3ff828b, type: 3}
+  QueenPrefab: {fileID: 7789360358756719155, guid: 15873bdf3116c164d9c5ddf496d0b9e0, type: 3}
+  KingPrefab: {fileID: 8684556453062766797, guid: 3460120ba48312744b10fbff8158fac3, type: 3}
+  SentinelPrefab: {fileID: 0}
+  MonolithPrefab: {fileID: 0}
+  BeastPrefab: {fileID: 0}
+  PunkPrefab: {fileID: 0}
+  DefaultTilePrefab: {fileID: 5792604660780605283, guid: bb5db63d1bae2d34a8e492d2ff882a4c, type: 3}
+  PieceSelectionPlaneHeight: 1
+  TileSpacing: {x: 1.02, y: 1.02}
