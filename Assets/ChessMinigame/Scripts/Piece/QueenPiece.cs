@@ -24,11 +24,14 @@ namespace ChessGame
             PieceType = ChessPieceType.Queen;
         }
 
-        public override HashSet<Vector2Int> GetPseudoMoves()
+        public override List<ChessAction> PseudoMoves()
         {
-            return GetMovesInDirections(QueenDirections);
+            return GetSlidingMoves(QueenDirections, 8);
         }
 
-
+        public override List<Vector2Int> ThreatenedPositions()
+        {
+            return GetSlidingCoordinates(QueenDirections, 8);
+        }
     }
 }

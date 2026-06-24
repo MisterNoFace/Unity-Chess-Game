@@ -23,11 +23,14 @@ namespace ChessGame
             PieceType = ChessPieceType.Knight;
         }
 
-        public override HashSet<Vector2Int> GetPseudoMoves()
+        public override List<ChessAction> PseudoMoves()
         {
-            return GetMovesInPositions(KnightMoves);
+            return GetJumpMoves(KnightMoves);
         }
 
-
+        public override List<Vector2Int> ThreatenedPositions()
+        {
+            return GetSingleCoordinates(KnightMoves);
+        }
     }
 }

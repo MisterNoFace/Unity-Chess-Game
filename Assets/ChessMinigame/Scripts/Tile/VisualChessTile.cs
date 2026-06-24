@@ -54,9 +54,8 @@ namespace ChessGame
             if (selectedPiece == null)
                 return;
 
-            if (selectedPiece.Logic.IsMoveLegal(Pos))
+            if (selectedPiece.Logic.MovesList().ContainsKey(Pos))
                 animation = true;
-    
         }
 
         private void OnPieceReleased(VisualChessPiece selectedPiece)
@@ -74,7 +73,7 @@ namespace ChessGame
 
         /*private void DisplayPiecePotentialActions(ChessPieceLogic obj)
         {
-            List<Vector2Int> moves = obj.GetPseudoMoves();
+            List<Vector2Int> moves = obj.PseudoMoves();
             if (moves.Contains(Pos))
                 TileVisualRenderer.material = SelectedTileMat;
             else

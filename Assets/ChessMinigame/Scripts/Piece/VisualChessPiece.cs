@@ -2,6 +2,7 @@
 using System.Collections;
 using Unity.VisualScripting;
 using UnityEngine;
+using static ChessGame.ChessBoard;
 
 namespace ChessGame
 {
@@ -13,6 +14,7 @@ namespace ChessGame
         public ChessTeam Team => Logic.Team;
         protected VisualChessTile VisualTile;
         public Vector2Int Pos => VisualTile.Pos;
+
         protected ChessBoardInstantiator BoardInstantiator;
         private CapsuleCollider SelectionCollider;
 
@@ -70,43 +72,45 @@ namespace ChessGame
             VisualTile = startingTile;
             AssignPiece(associatedPiece);
 
-            SetPivot(startingTile.PiecePivot);
+            StandingPivot = startingTile.PiecePivot;
             transform.right = new(Logic.ForwardDirection.x, 0, Logic.ForwardDirection.y);
             name = Logic.ToString();
-
-            Renderer pieceRenderer = PieceModel.GetComponent<Renderer>();
-
-            if (Team == ChessTeam.White)
-                pieceRenderer.material = WhiteMaterial;
-            else if (Team == ChessTeam.Black)
-                pieceRenderer.material = BlackMaterial;
-            else
-                Debug.LogWarning(name + " has an unknown Team");
-
-            PieceGhost = CreateGhost(); //the ghost is to be dragged to show the potential position
-            PieceGhost.transform.SetParent(transform);
-            ClearGhost();
         }
 
-        private void AssignPiece(ChessPiece piece)
+        public void AssignPiece(ChessPiece piece)
         {
             if (piece == null)
                 return;
             if (Logic != null)
             {
-                Logic.OnPositionChanged -= Logic_OnPositionChanged;
-                Logic.OnCapture -= Logic_OnCapture;
-                //Logic.OnPromotion -= Promote;
+                Logic.OnPositionChanged -= OnPieceMovement;
+                Logic.OnCapture -= OnPieceCapture;
+                Logic.OnPromotion -= OnPiecePromotion;
             }
-            //Logic.Board.Capture(Logic);
 
             Logic = piece;
+            Logic.OnPositionChanged += OnPieceMovement;
+            Logic.OnCapture += OnPieceCapture;
+            Logic.OnPromotion += OnPiecePromotion;
 
-            Logic.OnPositionChanged += Logic_OnPositionChanged;
-            Logic.OnCapture += Logic_OnCapture;
-            //Logic.OnPromotion += Promote;
 
             AssignPieceMesh(piece);
+        }
+
+        private void OnPieceMovement(ChessMove movement)
+        {
+            Move(BoardInstantiator.Tiles[movement.destination]);
+        }
+
+        private void OnPieceCapture(ChessCapture capture)
+        {
+            //Destroy(gameObject);
+            StartCoroutine(CaptureCoroutine());
+        }
+
+        private void OnPiecePromotion(ChessPromotion promotion)
+        {
+            AssignPiece(Logic.Board.GetPiece(promotion.position));
         }
 
         private void AssignPieceMesh(ChessPieceType pieceType)
@@ -126,26 +130,35 @@ namespace ChessGame
             };
 
             PieceModel = Instantiate(appliedModel, transform.position, transform.rotation, transform);
-
             Mesh m = PieceModel.GetComponent<MeshFilter>().mesh;
-            SelectionCollider.radius = m.bounds.size.x/2;
+            SelectionCollider.radius = m.bounds.size.x / 2;
             SelectionCollider.height = m.bounds.size.y;
             SelectionCollider.center = m.bounds.center;
-            //SelectionCollider.sharedMesh = m;
+
+            Renderer pieceRenderer = PieceModel.GetComponent<Renderer>();
+            if (Team == ChessTeam.White)
+                pieceRenderer.material = WhiteMaterial;
+            else
+                pieceRenderer.material = BlackMaterial;
+
+            Destroy(PieceGhost);
+            PieceGhost = CreateGhost(); //the ghost is to be dragged to show the potential position
+            PieceGhost.transform.SetParent(transform);
+            ClearGhost();
         }
 
         private void AssignPieceMesh(ChessPiece piece) => AssignPieceMesh(piece.PieceType);
 
-        private void Logic_OnCapture(ChessPiece piece, Vector2Int piecePosition)
+        /*private void OnCapture(ChessPiece piece, Vector2Int piecePosition)
         {
             StartCoroutine(CaptureCoroutine());
         }
 
-        private void Logic_OnPositionChanged(ChessPiece movedPiece, Vector2Int previousPosition, Vector2Int currentPosition)
+        private void OnPositionChanged(ChessPiece movedPiece, Vector2Int previousPosition, Vector2Int currentPosition)
         {
             //StartCoroutine(MoveToTileCoroutine(BoardInstantiator.Tiles[currentPosition]));
             MoveToTile(BoardInstantiator.Tiles[currentPosition]);
-        }
+        }*/
 
 
         private GameObject CreateGhost()
@@ -202,13 +215,6 @@ namespace ChessGame
             }
         }
 
-        protected void SetPivot(Transform newPivot)
-        {
-            StandingPivot = newPivot;
-            //if (StandingPivot != null)
-              //  transform.SetParent(StandingPivot);
-        }
-
         private IEnumerator MoveToTileCoroutine(VisualChessTile newTile)
         { 
             if (newTile == null)
@@ -217,7 +223,7 @@ namespace ChessGame
                 yield break;
             }
             Disable();
-            SetPivot(null);
+            StandingPivot = null;
             yield return StartCoroutine(SetFacingDirection(newTile.Pos - Pos));
             while (Vector3.Distance(newTile.PiecePivot.position, transform.position) > LERP_THRESHOLD)
             {
@@ -226,18 +232,18 @@ namespace ChessGame
             }
             
             VisualTile = newTile;
-            SetPivot(newTile.PiecePivot);
+            StandingPivot = newTile.PiecePivot;
             Enable();
             OnTileChanged?.Invoke(VisualTile, this);
         }
         
-        public void MoveToTile(VisualChessTile newTile)
+        public void Move(VisualChessTile newTile)
         {
             if (newTile == null)
                 Debug.LogWarning("Tile is null" + this);
             StartCoroutine(SetFacingDirection(newTile.Pos - Pos));
             VisualTile = newTile;
-            SetPivot(newTile.PiecePivot);
+            StandingPivot = newTile.PiecePivot;
             OnTileChanged?.Invoke(VisualTile, this);
         }
 

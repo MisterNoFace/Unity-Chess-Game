@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Text.RegularExpressions;
 using Unity.Cinemachine;
 using Unity.VisualScripting;
 using UnityEngine;
@@ -14,13 +15,11 @@ namespace ChessGame
         private readonly int BOARD_SIZE = 8;
         private ChessBoard Board;
         public Dictionary<Vector2Int, VisualChessTile> Tiles = new();
-        public Dictionary<Vector2Int, VisualChessPiece> Pieces = new();
+        public List<VisualChessPiece> Pieces = new();
 
 
         [Header("Piece Object")]
         public GameObject PiecePrefab;
-        public ChessTeam WhiteTeam => ChessTeam.White;
-        public ChessTeam BlackTeam => ChessTeam.Black;
 
         [Header("Cameras")]
         [SerializeField] Camera BoardCamera;
@@ -45,19 +44,91 @@ namespace ChessGame
 
         private void Awake()
         {
-            WhiteView.Priority = 100;
             GenerateTiles();
-
             Board = new(BOARD_SIZE);
             Board.OnPieceAdded += InstantiatePiece;
+            //Board.OnPieceCaptured += OnPieceCaptured;
+            //Board.OnPieceMoved += OnPieceMoved;
+            //Board.OnPieceReplaced += OnPieceReplaced;
             Board.OnTurnChanged += UpdateTurn;
+            Board.OnCheck += OnCheck;
+            Board.OnStaleMate += DisplayStalemate;
             Board.OnCheckmate += DisplayCheckmate;
-            //Board.OnPieceMoved += Board_OnPieceMoved;
-            //Board.OnPieceRemoved += Board_OnPieceRemoved;
-            //Board.GenerateBoard();
-            Board.AddPiece(ChessPieceType.Queen, new(5, 3), WhiteTeam);
-            Board.AddPiece(ChessPieceType.Pawn, new(0, 1), WhiteTeam);
-            Board.AddPiece(ChessPieceType.Pawn, new(2, 6), BlackTeam);
+            Board.GenerateBoard();
+            /*Board.Init();
+            Board.AddPiece(ChessPieceType.Rook, new(0, 0), ChessTeam.White);
+            Board.AddPiece(ChessPieceType.Rook, new(7, 0), ChessTeam.White);
+            Board.AddPiece(ChessPieceType.Rook, new(0, 7), ChessTeam.Black);
+            Board.AddPiece(ChessPieceType.Rook, new(7, 7), ChessTeam.Black);
+            Board.AddPiece(ChessPieceType.Pawn, new(0, 2), ChessTeam.White);
+            Board.AddPiece(ChessPieceType.Pawn, new(1, 6), ChessTeam.Black);
+            Board.AddPiece(ChessPieceType.Pawn, new(2, 2), ChessTeam.White);
+            Board.AddPiece(ChessPieceType.Pawn, new(3, 6), ChessTeam.Black);
+            /*Board.AddPiece(ChessPieceType.Queen, new(5, 3), ChessTeam.White);
+            Board.AddPiece(ChessPieceType.Pawn, new(0, 4), ChessTeam.White);
+            Board.AddPiece(ChessPieceType.Rook, new(3, 0), ChessTeam.Black);
+            Board.AddPiece(ChessPieceType.Pawn, new(2, 6), ChessTeam.Black);*/
+        }
+
+
+        protected void InstantiatePiece(ChessPieceType pieceType, ChessPiece piece, Vector2Int startingPosition)
+        {
+            GameObject go = Instantiate(PiecePrefab);
+            VisualChessPiece visualPiece = go.GetComponent<VisualChessPiece>();
+            visualPiece.Init(this, Tiles[startingPosition], piece);
+            Pieces.Add(visualPiece);
+        }
+
+        virtual protected void GenerateTiles()
+        {
+            Tiles = new();
+
+            for (int x = 0; x < BOARD_SIZE; x++)
+            {
+                for (int y = 0; y < BOARD_SIZE; y++)
+                {
+                    Vector2Int tilePos = new(x, y);
+                    VisualChessTile tile = Instantiate(DefaultTilePrefab).GetComponent<VisualChessTile>();
+                    tile.Init(this, tilePos);
+                    Tiles.Add(tilePos, tile);
+                }
+            }
+        }
+
+        /*private void OnPieceCaptured(ChessCapture capture)
+        {
+            foreach (VisualChessPiece piece in Pieces)
+                if (piece.Logic == capture.piece)
+                {
+                    piece.Capture();
+                    Pieces.Remove(piece);
+                    break;
+                }
+        }
+
+        private void OnPieceMoved(ChessMove movement)
+        {
+            foreach (VisualChessPiece piece in Pieces)
+                if (piece.Logic == movement.piece)
+                {
+                    piece.Move(Tiles[movement.destination]);
+                    break;
+                }
+        }
+
+        private void OnPieceReplaced(ChessPromotion promotion)
+        {
+            //Pieces[promotion.position].AssignPiece(Board.GetPiece(promotion.position));//this is wronge
+        }*/
+
+        private void OnCheck(ChessTeam checkedTeam)
+        {
+            Debug.Log("Hey there! you are in check mr " + checkedTeam);
+        }
+
+        private void DisplayStalemate(ChessTeam checkedTeam)
+        {
+            Debug.Log("STALEMATEDDDD team" + checkedTeam);
         }
 
         private void DisplayCheckmate(ChessTeam checkedTeam)
@@ -67,27 +138,24 @@ namespace ChessGame
 
         private void UpdateTurn(ChessTeam turn)
         {
-            foreach (var i in Pieces)
+            foreach (VisualChessPiece p in Pieces)
             {
-                VisualChessPiece p = i.Value;
                 if (p.Team != turn)
                     p.Disable();
                 else
                     p.Enable();
             }
 
-            if (turn == WhiteTeam)
+            if (turn == ChessTeam.White)
             {
                 WhiteView.Priority = 1;
                 BlackView.Priority = 0;
             }
-            else if (turn == BlackTeam)
+            else
             {
                 WhiteView.Priority = 0;
                 BlackView.Priority = 1;
             }
-            else
-                Debug.LogWarning("Switched to Unidentified team");
         }
 
 
@@ -105,6 +173,8 @@ namespace ChessGame
             }
         }
 
+
+        #region Update Game Logic
 
         private readonly RaycastHit[] hitColliders = new RaycastHit[8];
         protected bool GetHitTile(Ray ray, out VisualChessTile hitTile)
@@ -141,7 +211,7 @@ namespace ChessGame
             if (Mouse.current.leftButton.isPressed)
             {
                 //HANDLE PIECE DRAG
-                if (GetHitTile(ray, out VisualChessTile tile) && SelectedPiece.Logic.IsMoveLegal(tile.Pos))
+                if (GetHitTile(ray, out VisualChessTile tile) && SelectedPiece.Logic.MovesList().ContainsKey(tile.Pos))
                 {
                     SelectedPiece.MoveGhostAt(tile.PiecePivot.position);
                 }
@@ -159,11 +229,8 @@ namespace ChessGame
                 if (GetHitTile(ray, out VisualChessTile tile))
                 {
                     SelectedTile = tile;
-                    /*Debug.Log($"Logic: {SelectedPiece.name}");
-                    Debug.Log($"SelectedPiece: {SelectedPiece.Logic.PieceName}");
-                    Debug.Log($"SelectedTile: {SelectedTile.Pos}");*/
-                    if (SelectedPiece.Logic.IsMoveLegal(SelectedTile.Pos))
-                        Board.MakeMove(SelectedPiece.Pos, SelectedTile.Pos);
+                    if (SelectedPiece.Logic.MovesList().TryGetValue(SelectedTile.Pos, out ChessAction action))
+                        Board.MakeMove(action);
                 }
                 OnPieceReleased?.Invoke(SelectedPiece);
 
@@ -172,7 +239,7 @@ namespace ChessGame
                 SelectedTile = null;
             }
         }
-
+        #endregion
 
         #region Tile Positioning
         Vector2 currentSpacing = Vector2.zero;
@@ -193,61 +260,5 @@ namespace ChessGame
         }
         #endregion
 
-        #region Board Instantiation
-
-        protected void InstantiatePiece(ChessPieceType pieceType, ChessPiece piece, Vector2Int startingPosition)
-        {
-            GameObject go = Instantiate(PiecePrefab);
-            VisualChessPiece visualPiece = go.GetComponent<VisualChessPiece>();
-            visualPiece.Init(this, Tiles[startingPosition], piece);
-            Pieces.Add(startingPosition, visualPiece);
-        }
-
-        virtual protected void GenerateTiles()
-        {
-            Tiles = new();
-
-            for (int x = 0; x < BOARD_SIZE; x++)
-            {
-                for (int y = 0; y < BOARD_SIZE; y++)
-                {
-                    Vector2Int tilePos = new(x, y);
-                    VisualChessTile tile = Instantiate(DefaultTilePrefab).GetComponent<VisualChessTile>();
-                    tile.Init(this, tilePos);
-                    Tiles.Add(tilePos, tile);
-                }
-            }
-        }
-
-        /*virtual protected void GeneratePieces()
-        {
-            Pieces = new();
-            //WHITE PIECES
-            InstantiatePiece(ChessPieceType.Rook, new(0, 0), WhiteTeam);
-            for (int i = 0; i < BOARD_SIZE; i++)
-                InstantiatePiece(ChessPieceType.Pawn, new(i, 1), WhiteTeam);
-
-            InstantiatePiece(ChessPieceType.Rook, new(7, 0), WhiteTeam);
-            InstantiatePiece(ChessPieceType.Knight, new(1, 0), WhiteTeam);
-            InstantiatePiece(ChessPieceType.Knight, new(6, 0), WhiteTeam);
-            InstantiatePiece(ChessPieceType.Bishop, new(2, 0), WhiteTeam);
-            InstantiatePiece(ChessPieceType.Bishop, new(5, 0), WhiteTeam);
-            InstantiatePiece(ChessPieceType.Queen, new(3, 0), WhiteTeam);
-            InstantiatePiece(ChessPieceType.King, new(4, 0), WhiteTeam);
-            
-            //BLACK PIECES
-            for (int i = 0; i < BOARD_SIZE; i++)
-                InstantiatePiece(ChessPieceType.Pawn, new(i, 6), BlackTeam);
-
-            InstantiatePiece(ChessPieceType.Rook, new(0, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.Rook, new(7, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.Knight, new(1, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.Knight, new(6, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.Bishop, new(2, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.Bishop, new(5, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.Queen, new(3, 7), BlackTeam);
-            InstantiatePiece(ChessPieceType.King, new(4, 7), BlackTeam);
-        }*/
-        #endregion
     }
 }

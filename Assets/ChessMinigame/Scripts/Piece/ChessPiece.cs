@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace ChessGame
 {
@@ -16,10 +18,10 @@ namespace ChessGame
         public readonly ChessTeam Team;
         //public Vector2Int Pos { get; private set; }
         public Vector2Int Pos => Board.GetPositionOf(this);
-        private Vector2Int VirtualPos;
         public bool HasMovedOnce { get; private set; } = false;
+        public bool Captured { get; private set; } = false;
 
-        public readonly Vector2Int ForwardDirection;
+        public Vector2Int ForwardDirection => TeamForwardDirections[Team];
         public Dictionary<ChessTeam, Vector2Int> TeamForwardDirections = new()
         {
             {ChessTeam.White, Vector2Int.up},
@@ -28,21 +30,16 @@ namespace ChessGame
 
 
         #region Piece Events
-        /*public delegate void ChessMove(ChessPiece movedPiece, Vector2Int previousPosition, Vector2Int currentPosition);
-        public delegate void ChessPosition(ChessPiece piece, Vector2Int piecePosition);
-        public event ChessMove OnPositionChanged;
-        public event ChessPosition OnCapture;
-        public event ChessPosition OnPromotion;*/
-        public delegate void ChessActionDelegate(ChessAction action);
-        public event ChessActionDelegate OnPieceAction;
+        public event ChessBoard.PieceMovement OnPositionChanged;
+        public event ChessBoard.PieceCapture OnCapture;
+        public event ChessBoard.PiecePromotion OnPromotion;
+
         #endregion
 
-        public ChessPiece(ChessBoard board, /*Vector2Int startingPosition,*/ ChessTeam pieceTeam)
+        public ChessPiece(ChessBoard board, ChessTeam pieceTeam)
         {
             Board = board;
-            //Pos = startingPosition;
             Team = pieceTeam;
-            ForwardDirection = TeamForwardDirections[pieceTeam];
         }
 
         public override string ToString()
@@ -65,10 +62,34 @@ namespace ChessGame
             return piece.Team != this.Team;
         }
 
-        virtual public void Update(ChessAction action)
+        public bool IsAlly(ChessPiece piece)
         {
+            if (piece == null)
+                return false;
+            return piece.Team == this.Team;
+        }
+
+        virtual public void UpdatePosition(ChessMove move)
+        {
+            if (move.piece != this)
+                return;
             HasMovedOnce = true;
-            
+            OnPositionChanged?.Invoke(move);
+        }
+
+        virtual public void UpdateCapture(ChessCapture capture)
+        {
+            if (capture.piece != this)
+                return;
+            Captured = true;
+            OnCapture?.Invoke(capture);
+        }
+
+        virtual public void UpdatePromotion(ChessPromotion promotion)
+        {
+            if (promotion.piece != this)
+                return;
+            OnPromotion.Invoke(promotion);
         }
 
         /*virtual public void UpdatePosition(Vector2Int newPosition)
@@ -106,29 +127,122 @@ namespace ChessGame
         
 
         #region Piece Moveset Methods
-        abstract public HashSet<Vector2Int> GetPseudoMoves();
-        public bool IsMoveInMoveset(Vector2Int move) => GetPseudoMoves().Contains(move);
-        public bool IsMoveLegal(Vector2Int move) => Board.GetLegalMovesOf(this).Contains(move);
-        virtual public HashSet<Vector2Int> GetThreatenedPositions() => GetPseudoMoves();
+        abstract public List<ChessAction> PseudoMoves();
+        public List<ChessAction> LegalMoves() => Board.GetLegalMovesOf(this);
+        
+        public Dictionary<Vector2Int, ChessAction> MovesList()
+        {
+            Dictionary<Vector2Int, ChessAction> positions = new();
+            foreach (ChessAction action in LegalMoves())
+                foreach (IChessOperation operation in action.actions)
+                    if (operation is ChessMove move)
+                    {
+                        positions[move.destination] = action;
+                        break;
+                    }
+
+            return positions;
+        }
+
+        abstract public List<Vector2Int> ThreatenedPositions();
+        /*{
+            List<Vector2Int> threats = new();
+            foreach (ChessAction action in PseudoMoves())
+                foreach (IChessOperation operation in action.actions)
+                    if (operation is ChessCapture capture)
+                        threats.Add(capture.position);
+
+            return threats;
+        }*/
+        
+        virtual protected ChessAction GenerateAction(Vector2Int finalPosition, bool capture = true)
+        {
+            List<IChessOperation> ops = new();
+            if (!Board.Exists(finalPosition))
+                return new();
+
+            if (capture)
+            {
+                ops.Add(new ChessCapture(Board.GetPiece(finalPosition), finalPosition));
+                ops.Add(new ChessMove(this, Pos, finalPosition));
+            }
+
+            else if (Board.GetPiece(finalPosition) == null)
+                ops.Add(new ChessMove(this, Pos, finalPosition));
+
+            return new(ops);
+        }
+
+        protected List<ChessAction> GetSlidingMoves(List<Vector2Int> directions, int repetition = 1, bool canCapture = true)
+        {
+            List<ChessAction> slidingActions = new();
+            ChessAction action;
+            Vector2Int target;
+
+            foreach (Vector2Int dir in directions)
+            {
+                target = Pos + dir;
+                for (int i = 0; i < repetition && Board.Exists(target); i++)
+                {
+                    ChessPiece captured = Board.GetPiece(target);
+
+                    if (IsAlly(captured))
+                        break;
+
+                    action = GenerateAction(target, canCapture);
+                    
+                    slidingActions.Add(action);
+                    target += dir;
+
+                    if (IsEnemy(captured))
+                        break;
+                }
+            }
+
+            return slidingActions;
+        }
+
+        protected List<ChessAction> GetJumpMoves(List<Vector2Int> jumps, int repetition = 1, bool canCapture = true)
+        {
+            List<ChessAction> jumpActions = new();
+            ChessAction action;
+            Vector2Int target;
+
+            int rep = 0;
+            do
+            {
+                rep++;
+                foreach (Vector2Int jump in jumps)
+                {
+                    target = Pos + jump * rep;
+                    if (Board.Exists(target))
+                    {
+                        ChessPiece captured = Board.GetPiece(target);
+                        if (IsAlly(captured))
+                            continue;
+
+                        action = GenerateAction(target, canCapture);
+
+                        jumpActions.Add(action);
+                    }
+                }
+            }
+            while (rep < repetition);
+
+            return jumpActions;
+        }
+        #endregion
         
 
-        /// <summary>
-        /// Returns the moves of given directions,
-        /// it can be used for pieces such as Queen, Rook, Bishop 
-        /// which can travel an unlimited amount of tiles 
-        /// </summary>
-        /// <param name="directions">the list of directions</param>
-        /// <param name="currentTilePos">the position to start checking the moves</param>
-        /// <param name="board">the board object that contains all the game logic</param>
-        virtual protected HashSet<Vector2Int> GetMovesInDirections(List<Vector2Int> directions)
+        virtual protected List<Vector2Int> GetSlidingCoordinates(List<Vector2Int> directions, int repetition = 1)
         {
-            HashSet<Vector2Int> movesInDirections = new();
+            List<Vector2Int> movesInDirections = new();
             movesInDirections.Clear();
             Vector2Int move;
             foreach (Vector2Int dir in directions)
             {
                 move = Pos + dir;
-                while (Board.Exists(move))
+                for (int i = 0; i < repetition && Board.Exists(move); i++)
                 {
                     ChessPiece piece = Board.GetPiece(move);
                     if (piece == null)
@@ -145,17 +259,9 @@ namespace ChessGame
             return movesInDirections;
         }
 
-        /// <summary>
-        /// Returns if the piece can move in the given coordinates,
-        /// it can be used for pieces such as King, Knight 
-        /// which have fixed tiles they can travel
-        /// </summary>
-        /// <param name="positions">the list of fixed positions</param>
-        /// <param name="currentTilePos">the position to start checking the moves</param>
-        /// <param name="board">the board object that contains all the game logic</param>
-        virtual protected HashSet<Vector2Int> GetMovesInPositions(List<Vector2Int> positions)
+        virtual protected List<Vector2Int> GetSingleCoordinates(List<Vector2Int> positions)
         {
-            HashSet<Vector2Int> availablePositions = new();
+            List<Vector2Int> availablePositions = new();
             availablePositions.Clear();
             Vector2Int move;
             foreach (Vector2Int pos in positions)
@@ -171,10 +277,7 @@ namespace ChessGame
             return availablePositions;
         }
 
-        #endregion  
 
-        
     }
-    
-}
 
+}

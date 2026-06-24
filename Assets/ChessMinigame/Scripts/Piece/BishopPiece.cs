@@ -19,11 +19,14 @@ namespace ChessGame
             PieceType = ChessPieceType.Bishop;
         }
 
-        public override HashSet<Vector2Int> GetPseudoMoves()
+        public override List<ChessAction> PseudoMoves()
         {
-            return GetMovesInDirections(BishopDirections);
+            return GetSlidingMoves(BishopDirections, 8);
         }
 
-
+        public override List<Vector2Int> ThreatenedPositions()
+        {
+            return GetSlidingCoordinates(BishopDirections, 8);
+        }
     }
 }

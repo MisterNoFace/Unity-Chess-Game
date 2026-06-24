@@ -19,10 +19,14 @@ namespace ChessGame
             PieceType = ChessPieceType.Rook;
         }
 
-        public override HashSet<Vector2Int> GetPseudoMoves()
+        public override List<ChessAction> PseudoMoves()
         {
-            return GetMovesInDirections(RookDirections);
+            return GetSlidingMoves(RookDirections, 8);
         }
 
+        public override List<Vector2Int> ThreatenedPositions()
+        {
+            return GetSlidingCoordinates(RookDirections, 8);
+        }
     }
 }

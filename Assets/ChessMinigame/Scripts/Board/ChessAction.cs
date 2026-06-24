@@ -6,78 +6,66 @@ namespace ChessGame
     public interface IChessOperation
     {
         public ChessPiece piece { get; }
-        public void Apply(ChessBoard board);
+        public Vector2Int position { get; }
     }
 
     public readonly struct ChessMove : IChessOperation
     {
         public readonly ChessPiece piece { get; }
-        public readonly Vector2Int from;
-        public readonly Vector2Int to;
+        public readonly Vector2Int position { get; }
+        public readonly Vector2Int destination;
 
-        public ChessMove(ChessPiece movedPiece, Vector2Int from, Vector2Int to)
+        public ChessMove(ChessPiece piece, Vector2Int from, Vector2Int to)
         {
-            this.piece = movedPiece;
-            this.from = from;
-            this.to = to;
-        }
-
-        public void Apply(ChessBoard board)
-        {
-            
+            this.piece = piece;
+            this.position = from;
+            this.destination = to;
         }
     }
 
     public readonly struct ChessPromotion : IChessOperation
     {
         public readonly ChessPiece piece { get; }
+        public readonly Vector2Int position { get; }
         public readonly ChessPieceType promotionType;
-        public readonly Vector2Int position;
 
-        public ChessPromotion(ChessPiece promotedPiece, ChessPieceType promotionType, Vector2Int position)
+        public ChessPromotion(ChessPiece piece, ChessPieceType promotionType, Vector2Int position)
         {
-            this.piece = promotedPiece;
+            this.piece = piece;
             this.promotionType = promotionType;
             this.position = position;
-        }
-
-        public void Apply(ChessBoard board)
-        {
-            throw new System.NotImplementedException();
         }
     }
 
     public readonly struct ChessCapture : IChessOperation
     {
         public readonly ChessPiece piece { get; }
-        public readonly Vector2Int position;
+        public readonly Vector2Int position { get; }
 
-        public ChessCapture(ChessPiece capturedPiece, Vector2Int position)
+        public ChessCapture(ChessPiece piece, Vector2Int position)
         {
-            this.piece = capturedPiece;
+            this.piece = piece;
             this.position = position;
-        }
-
-
-        public void Apply(ChessBoard board)
-        {
-            throw new System.NotImplementedException();
         }
     }
 
     /// <summary>
-    /// represents any move a piece makes as a list of operations
+    /// Represents any move a piece can make as a list of IChessOperation.
     /// </summary>
     public readonly struct ChessAction
     {
         public readonly List<IChessOperation> actions;
-        
+
         public ChessAction(params IChessOperation[] operations)
         {
             actions = new();
             foreach (IChessOperation operation in operations)
                 actions.Add(operation);
         }
-        public readonly void Add(IChessOperation operation) => actions.Add(operation);
+
+        public ChessAction(List<IChessOperation> operations)
+        {
+            actions = operations;
+        }
     }
 }

@@ -1,12 +1,5 @@
-using NUnit.Framework.Constraints;
-using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Splines;
-using UnityEngine.UIElements;
 
 namespace ChessGame
 {
@@ -16,7 +9,6 @@ namespace ChessGame
         private readonly ChessPiece[,] Grid;
         public ChessTeam CurrentTurnTeam { get; private set; } = ChessTeam.White;
         private bool IsCheck = false;
-        private bool IsCheckmate = false;
 
         #region Pieces Memory
         public KingPiece WhiteKing { get; protected set; }
@@ -26,7 +18,6 @@ namespace ChessGame
         #endregion
 
         #region Piece Factory
-        //private delegate ChessPiece PieceInstantiator(ChessBoard board, Vector2Int startingPosition, ChessTeam pieceTeam);
         private delegate ChessPiece PieceInstantiator(ChessBoard board, ChessTeam pieceTeam);
         private readonly Dictionary<ChessPieceType, PieceInstantiator> PieceFactory = new()
         {
@@ -40,37 +31,51 @@ namespace ChessGame
         #endregion
 
         #region Board Events
+        //ChessAction operations
+        public delegate void PieceAddition(ChessPieceType pieceType, ChessPiece addedPiece, Vector2Int startingPosition);
+        public delegate void PieceMovement(ChessMove movement);
+        public delegate void PieceCapture(ChessCapture capture);
+        public delegate void PiecePromotion(ChessPromotion promotion);
+
+        public event PieceAddition OnPieceAdded;
+        public event PieceMovement OnPieceMoved;
+        public event PieceCapture OnPieceCaptured;
+        public event PiecePromotion OnPieceReplaced;
+
+        //Game events
+        public delegate void ChessActionDelegate(ChessAction action);
         public delegate void TurnDelegate(ChessTeam currentTeam);
-        public delegate void PieceAddDelegate(ChessPieceType pieceType, ChessPiece addedPiece, Vector2Int startingPosition);
         public delegate void CheckDelegate(ChessTeam checkedTeam);
 
+        public event ChessActionDelegate OnMove;
         public event TurnDelegate OnTurnChanged;
-        public event PieceAddDelegate OnPieceAdded;
-        public event PieceAddDelegate OnPieceReplaced;
-        public event ChessPiece.ChessMove OnPieceMoved;
-        public event ChessPiece.ChessPosition OnPieceRemoved;
         public event CheckDelegate OnCheck;
         public event CheckDelegate OnStaleMate;
         public event CheckDelegate OnCheckmate;
         #endregion
 
-        public ChessBoard(int boardSize, Vector2Int whiteKingPosition = default, Vector2Int blackKingPosition = default)
+        public ChessBoard(int boardSize)
         {
             Size = boardSize;
             Grid = new ChessPiece[Size, Size];
+        }
 
+        public void Init(Vector2Int whiteKingPosition = default, Vector2Int blackKingPosition = default)
+        {
             if (whiteKingPosition == default)
                 whiteKingPosition = new(4, 0);
             if (blackKingPosition == default)
                 blackKingPosition = new(4, 7);
-
-            WhiteKing = (KingPiece) AddPiece(ChessPieceType.King, whiteKingPosition, ChessTeam.White);
-            BlackKing = (KingPiece) AddPiece(ChessPieceType.King, blackKingPosition, ChessTeam.Black);
+            if (WhiteKing == null)
+                WhiteKing = (KingPiece)AddPiece(ChessPieceType.King, whiteKingPosition, ChessTeam.White);
+            if (BlackKing == null)
+                BlackKing = (KingPiece)AddPiece(ChessPieceType.King, blackKingPosition, ChessTeam.Black);
         }
-
 
         virtual public void GenerateBoard()
         {
+            Init();
+
             //WHITE PIECES
             AddPiece(ChessPieceType.Rook, new Vector2Int(0, 0), ChessTeam.White);
             for (int i = 0; i < Size; i++)
@@ -82,7 +87,6 @@ namespace ChessGame
             AddPiece(ChessPieceType.Bishop, new Vector2Int(2, 0), ChessTeam.White);
             AddPiece(ChessPieceType.Bishop, new Vector2Int(5, 0), ChessTeam.White);
             AddPiece(ChessPieceType.Queen, new Vector2Int(3, 0), ChessTeam.White);
-            //AddPiece(ChessPieceType.King, new Vector2Int(4, 0), ChessTeam.White);
 
             //BLACK PIECES
             for (int i = 0; i < Size; i++)
@@ -94,8 +98,7 @@ namespace ChessGame
             AddPiece(ChessPieceType.Knight, new Vector2Int(6, 7), ChessTeam.Black);
             AddPiece(ChessPieceType.Bishop, new Vector2Int(2, 7), ChessTeam.Black);
             AddPiece(ChessPieceType.Bishop, new Vector2Int(5, 7), ChessTeam.Black);
-            AddPiece(ChessPieceType.Queen, new Vector2Int(3, 7), ChessTeam.Black);
-            //AddPiece(ChessPieceType.King, new Vector2Int(4, 7), ChessTeam.Black);
+            AddPiece(ChessPieceType.Queen, new Vector2Int(3, 7), ChessTeam.Black);       
         }
         public void ResetBoard()
         {
@@ -110,8 +113,8 @@ namespace ChessGame
         }
 
         public bool Exists(Vector2Int position) =>
-            (uint) position.x < Size && (uint) position.y < Size;
-        
+            (uint)position.x < Size && (uint)position.y < Size;
+
         public Vector2Int GetPositionOf(ChessPiece piece)
         {
             for (int x = 0; x < Size; x++)
@@ -136,7 +139,7 @@ namespace ChessGame
                 Grid[position.x, position.y] = piece;
         }
 
-       
+
 
         public ChessPiece AddPiece(ChessPieceType pieceType, Vector2Int startingPosition, ChessTeam pieceTeam)
         {
@@ -148,14 +151,14 @@ namespace ChessGame
                 if (pieceTeam == ChessTeam.White)
                 {
                     if (WhiteKing == null)
-                        WhiteKing = (KingPiece) piece;
+                        WhiteKing = (KingPiece)piece;
                     else
                         return null;
                 }
                 if (pieceTeam == ChessTeam.Black)
                 {
                     if (BlackKing == null)
-                        BlackKing = (KingPiece) piece;
+                        BlackKing = (KingPiece)piece;
                     else
                         return null;
                 }
@@ -171,42 +174,6 @@ namespace ChessGame
             return piece;
         }
 
-        public ChessPiece ReplacePiece(ChessPiece replaced, ChessPieceType newType)
-        {
-            //avoid replacing a piece with one of the same type
-            //avoid placing/replacing a piece of type king
-            if (replaced == null ||replaced.Board != this || replaced.PieceType == newType || 
-                replaced.PieceType == ChessPieceType.King || newType == ChessPieceType.King)
-                return null;
-
-            ChessPiece newPiece = PieceFactory[newType](this, replaced.Team);
-            
-            //remove the old piece
-            WhitePieces.Remove(replaced);
-            BlackPieces.Remove(replaced);
-            Set(replaced.Pos, null);
-
-            //replacement
-            if (newPiece.Team == ChessTeam.White)
-                WhitePieces.Add(newPiece);
-            else
-                BlackPieces.Add(newPiece);
-            Set(newPiece.Pos, newPiece);
-            OnPieceReplaced?.Invoke(newType, newPiece, newPiece.Pos);
-            return newPiece;
-        }
-
-        public bool Capture(ChessPiece piece)
-        {
-            if (!(WhitePieces.Remove(piece) || BlackPieces.Remove(piece)))
-                return false;
-            Set(piece.Pos, null);
-            OnPieceRemoved?.Invoke(piece, piece.Pos);
-            return true;
-        }
-
-        public bool CapturePieceAt(Vector2Int position) => Capture(Get(position));
-
         private void UpdateTurn()
         {
             if (CurrentTurnTeam == ChessTeam.White)
@@ -218,35 +185,71 @@ namespace ChessGame
         }
 
 
-        private bool MovePiece(Vector2Int from, Vector2Int to)
+        #region Chess Operations
+        public bool Capture(ChessCapture capture)
         {
-            ChessPiece piece = Get(from);
-            if (piece == null || !Exists(from) || !Exists(to) || from == to)
+            if (capture.piece == null)
                 return false;
-            Set(to, piece);
-            //piece.UpdatePosition(to);
-            Set(from, null);
+
+            WhitePieces.Remove(capture.piece);
+            BlackPieces.Remove(capture.piece);
+
+            Set(capture.position, null);
+            capture.piece.UpdateCapture(capture);
+            OnPieceCaptured?.Invoke(capture);
             return true;
         }
 
-        //the goat
-        public bool MakeMove(Vector2Int oldPosition, Vector2Int newPosition)
+        public bool Move(ChessMove move)
+        {
+            Set(move.destination, move.piece);
+            Set(move.position, null);
+            move.piece.UpdatePosition(move);
+            OnPieceMoved?.Invoke(move);
+            return true;
+        }
+
+        public bool Promote(ChessPromotion promotion)
+        {
+            ChessPiece promoted = promotion.piece;
+            if (promoted == null || 
+                promotion.promotionType == ChessPieceType.King || 
+                promotion.promotionType == promotion.piece.PieceType)
+                return false;
+
+            ChessPiece newPiece = PieceFactory[promotion.promotionType](this, promoted.Team);
+            Set(promotion.position, newPiece);
+
+            if (promoted.Team == ChessTeam.White)
+            {
+                WhitePieces.Remove(promoted);
+                WhitePieces.Add(newPiece);
+            }
+            else
+            {
+                BlackPieces.Remove(promoted);
+                BlackPieces.Add(newPiece);
+            }
+
+            promotion.piece.UpdatePromotion(promotion);
+            OnPieceReplaced?.Invoke(promotion);
+            return true;
+        }
+
+        public void MakeMove(ChessAction action)
         {
             IsCheck = false;
 
-            ChessPiece piece = Get(oldPosition);
-            ChessPiece captured = Get(newPosition);
-            
-            //move the piece to a new position
-            if (!MovePiece(oldPosition, newPosition))
-                //if the move didn't happen
-                return false;
-            
-            //capture and delete any piece in the new position
-            Capture(captured);
+            foreach (IChessOperation op in action.actions)
+            {
+                if (op is ChessMove move)
+                    Move(move);
+                else if (op is ChessCapture capture)
+                    Capture(capture);
+                else if (op is ChessPromotion promotion)
+                    Promote(promotion);
+            }
 
-
-            
             UpdateTurn();
             if (IsKingUnderAttack(CurrentTurnTeam))
             {
@@ -254,31 +257,126 @@ namespace ChessGame
                 OnCheck?.Invoke(CurrentTurnTeam);
             }
             CalculateCheckmate();
+            OnMove?.Invoke(action);
+        }
+        #endregion
 
-            OnPieceMoved?.Invoke(piece, oldPosition, newPosition);
-            return true;
+
+        #region Virtual Operations
+
+        Stack<ChessAction> VirtualActions = new();
+        private void VirtualCapture(ChessCapture capture)
+        {
+            WhitePieces.Remove(capture.piece);
+            BlackPieces.Remove(capture.piece);
+            Set(capture.position, null);
         }
 
-        
+        private void VirtualMove(ChessMove move)
+        {
+            Set(move.destination, move.piece);
+            Set(move.position, null);
+        }
+
+        private void VirtualPromote(ChessPromotion promotion)
+        {
+            ChessPiece promoted = promotion.piece;
+            
+            ChessPiece newPiece = PieceFactory[promotion.promotionType](this, promoted.Team);
+            Set(promotion.position, newPiece);
+            
+            if (promoted.Team == ChessTeam.White)
+            {
+                WhitePieces.Remove(promoted);
+                WhitePieces.Add(newPiece);
+            }
+            else
+            {
+                BlackPieces.Remove(promoted);
+                BlackPieces.Add(newPiece);
+            }
+
+        }
+
+        private void VirtualAction(ChessAction action)
+        {
+            foreach (IChessOperation op in action.actions)
+            {
+                if (op is ChessMove move)
+                    VirtualMove(move);
+                else if (op is ChessCapture capture)
+                    VirtualCapture(capture);
+                else if (op is ChessPromotion promotion)
+                    VirtualPromote(promotion);
+            }
+            VirtualActions.Push(action);
+        }
+
+        private void UndoVirtualCapture(ChessCapture capture)
+        {
+            if (capture.piece == null)
+                return;
+            if (capture.piece.Team == ChessTeam.White)
+                WhitePieces.Add(capture.piece);
+            else
+                BlackPieces.Add(capture.piece);
+            Set(capture.position, capture.piece);
+        }
+
+        private void UndoVirtualMove(ChessMove move)
+        {
+            Set(move.position, move.piece);
+            if (Get(move.destination) == move.piece)
+                Set(move.destination, null);
+        }
+
+        private void UndoVirtualPromote(ChessPromotion promotion)
+        {
+            ChessPiece promoted = Get(promotion.position);
+            Set(promotion.position, promotion.piece);
+            if (promoted.Team == ChessTeam.White)
+            {
+                WhitePieces.Remove(promoted);
+                WhitePieces.Add(promotion.piece);
+            }
+            else
+            {
+                BlackPieces.Remove(promoted);
+                BlackPieces.Add(promotion.piece);
+            }
+
+        }
+
+
+        private void UndoVirtualAction()
+        {
+            if (!VirtualActions.TryPop(out ChessAction action))
+                return;
+            
+            
+            for (int i = action.actions.Count - 1; i >= 0; i--)
+            {
+                IChessOperation op = action.actions[i];
+                if (op is ChessMove move)
+                    UndoVirtualMove(move);
+                else if (op is ChessCapture capture)
+                    UndoVirtualCapture(capture);
+                else if (op is ChessPromotion promotion)
+                    UndoVirtualPromote(promotion);
+            }
+        }
+        #endregion
+
+
         public bool IsSquareUnderAttack(Vector2Int position, ChessTeam attackerTeam)
         {
-            switch (attackerTeam)
-            {
-                case ChessTeam.White:
-                    foreach (ChessPiece p in WhitePieces)
-                        if (p.GetThreatenedPositions().Contains(position))
-                            return true;
-                    break;
+            List<ChessPiece> team = WhitePieces;
+            if (attackerTeam != ChessTeam.White)
+                team = BlackPieces;
 
-                case ChessTeam.Black:
-                    foreach (ChessPiece p in BlackPieces)
-                        if (p.GetThreatenedPositions().Contains(position))
-                            return true;
-                    break;
-
-                default:
-                    return false;
-            }
+            foreach (ChessPiece piece in team)
+                if (piece.ThreatenedPositions().Contains(position))
+                    return true;
             return false;
         }
 
@@ -293,52 +391,18 @@ namespace ChessGame
         }
 
 
-        private bool TryVirtualMove(ChessPiece piece, Vector2Int virtualPosition)
+        public List<ChessAction> GetLegalMovesOf(ChessPiece piece)
         {
-            Vector2Int originalPosition = piece.Pos;
-            ChessPiece captured = Get(virtualPosition);
-
-            //remove any captured piece
-            if (captured != null)
-            {
-                WhitePieces.Remove(captured);
-                BlackPieces.Remove(captured);
-            }
-
-            //do virtual move
-            Set(originalPosition, null);
-            Set(virtualPosition, piece);
-            //piece.SetVirtualPosition(virtualPosition);
-
-            //find a check
-            bool check = IsKingUnderAttack(piece.Team);
-
-            //undo
-            Set(originalPosition, piece);
-            Set(virtualPosition, captured);
-            //piece.UnsetVirtualPosition();
-
-            //reinsert the captured piece
-            if (captured != null)
-            {
-                if (captured.Team == ChessTeam.White)
-                    WhitePieces.Add(captured);
-                else
-                    BlackPieces.Add(captured);
-            }
-
-            return check;
-        }
-
-        public HashSet<Vector2Int> GetLegalMovesOf(ChessPiece piece)
-        {
-            HashSet<Vector2Int> legals = new();
+            List<ChessAction> legals = new();
             if (piece.Board != this)
                 return null;
-            foreach (Vector2Int move in piece.GetPseudoMoves())
+
+            foreach (ChessAction action in piece.PseudoMoves())
             {
-                if (!TryVirtualMove(piece, move))
-                    legals.Add(move);
+                VirtualAction(action);
+                if (!IsKingUnderAttack(piece.Team))
+                    legals.Add(action);
+                UndoVirtualAction();
             }
 
             return legals;
@@ -349,18 +413,17 @@ namespace ChessGame
             List<ChessPiece> team = WhitePieces;
             if (CurrentTurnTeam != ChessTeam.White)
                 team = BlackPieces;
+
             foreach (ChessPiece piece in team)
                 if (GetLegalMovesOf(piece).Count != 0)
                     return false;
-            
 
             if (IsCheck)
                 OnCheckmate?.Invoke(CurrentTurnTeam);
             else
                 OnStaleMate?.Invoke(CurrentTurnTeam);
 
-            IsCheckmate = true;
-            return IsCheckmate;
+            return true;
         }
 
     }

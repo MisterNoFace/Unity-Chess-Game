@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering.Universal.Internal;
+using static UnityEngine.Audio.ProcessorInstance;
 
 namespace ChessGame
 {
@@ -25,54 +27,87 @@ namespace ChessGame
             PieceType = ChessPieceType.King;
         }
 
-        public override HashSet<Vector2Int> GetPseudoMoves()
+
+
+        public override List<ChessAction> PseudoMoves()
         {
-            HashSet<Vector2Int> moves = GetMovesInPositions(KingMoves);
-            //castle
-            /*if (!HasMovedOnce)
+            List<ChessAction> moves = new();
+
+            
+            if (!HasMovedOnce)
             {
-                Vector2Int move = Pos + Vector2Int.left;
-                while (Board.Exists(move))
+                int y = Pos.y;
+                int rookX = 0;
+                int kingX = Pos.x;
+                ChessTeam opposite = ChessTeam.White;
+                if (Team == ChessTeam.White)
+                    opposite = ChessTeam.Black;
+
+                ChessPiece rook = Board.GetPiece(new(rookX, y));
+
+                if (rook is RookPiece && !rook.HasMovedOnce)
                 {
-                    ChessPiece piece = Board.GetPiece(move);
-                    if (piece == null)
-                        continue;
-                    if (piece is not RookPiece)
-                        break;
-                    else if (!piece.HasMovedOnce)
+                    for (int x = rookX + 1; x < kingX - 1; x++)
                     {
-                        moves.Add(Pos + Vector2Int.left * 2);
-                        break;
+                        if (Board.GetPiece(new(x, y)) != null)
+                            goto NextRook;
                     }
-                    move += Vector2Int.left;
+
+                    Vector2Int kingPos = new(kingX - 2, y);
+                    Vector2Int rookPos = new(kingX - 1, y);
+
+                    if (Board.IsSquareUnderAttack(kingPos, opposite) || 
+                        Board.IsSquareUnderAttack(rookPos, opposite) ||
+                        Board.IsKingUnderAttack(Team))
+                        goto NextRook;
+
+                    ChessAction leftCastle = new(
+                        new ChessMove(this, Pos, kingPos),
+                        new ChessMove(rook, rook.Pos, rookPos)
+                        );
+                    moves.Add(leftCastle);
                 }
 
-                Vector2Int move = Pos + Vector2Int.left;
-                while (Board.Exists(move))
+
+
+                NextRook:
+                rookX = Board.Size - 1;
+
+                rook = Board.GetPiece(new(rookX, y));
+
+                if (rook is RookPiece && !rook.HasMovedOnce)
                 {
-                    ChessPiece piece = Board.GetPiece(move);
-                    if (piece == null)
-                        continue;
-                    if (piece is not RookPiece)
-                        break;
-                    else if (!piece.HasMovedOnce)
+                    for (int x = kingX + 1; x < rookX - 1; x++)
                     {
-                        moves.Add(Pos + Vector2Int.left * 2);
-                        break;
+                        if (Board.GetPiece(new(x, y)) != null)
+                            goto Finale;
                     }
-                    move += Vector2Int.left;
+
+                    Vector2Int kingPos = new(kingX + 2, y);
+                    Vector2Int rookPos = new(kingX + 1, y);
+
+                    if (Board.IsSquareUnderAttack(kingPos, opposite) ||
+                        Board.IsSquareUnderAttack(rookPos, opposite) ||
+                        Board.IsKingUnderAttack(Team))
+                        goto Finale;
+
+                    ChessAction rightCastle = new(
+                        new ChessMove(this, Pos, kingPos),
+                        new ChessMove(rook, rook.Pos, rookPos)
+                        );
+                    moves.Add(rightCastle);
                 }
-            }*/
+
+            }
+
+            Finale:
+            moves.AddRange(GetSlidingMoves(KingMoves));
             return moves;
         }
 
-        public override void UpdatePosition(Vector2Int newPosition)
+        public override List<Vector2Int> ThreatenedPositions()
         {
-            base.UpdatePosition(newPosition);
+            return GetSingleCoordinates(KingMoves);
         }
-
-
-
-
     }
 }
