@@ -59,26 +59,18 @@ L'interfaccia fornisce informazioni essenziali durante la partita:
 
 ## Modelli 3D dei Pezzi
 
-*Figura 1 - Modelli 3D dei pezzi degli scacchi.*
-
 ![Modelli 3D dei pezzi](chess-pieces.png)
-
+![Modelli 3D dei pezzi in gioco](chess-pieces-ingame.png)
 ---
 
 ## Gameplay
 
-Di seguito è possibile inserire un video dimostrativo del funzionamento del gioco.
+![Video Gameplay](chess-gameplay.mp4)
 
-[Video Gameplay](chess-gameplay.mp4)
-
-In alternativa:
-
-```html
-<video width="800" controls>
-    <source src="chess-gameplay.mp4" type="video/mp4">
-    Il tuo browser non supporta il tag video.
+<video width="640" height="360" controls>
+ <source src="chess-gameplay.mp4" type="video/mp4">
+ Your browser does not support the video tag
 </video>
-```
 
 ---
 
@@ -111,4 +103,4 @@ Possibilità di scegliere il pezzo desiderato quando un pedone raggiunge l'ultim
 - Unity
 - C#
 - Sistema di Input di Unity
-- Modelli 3D ottimizzati per il rendering in tempo reale
+- Blender: Modelli 3D
